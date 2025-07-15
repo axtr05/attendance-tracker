@@ -146,10 +146,20 @@ async function handleRoute(request, { params }) {
       const { token } = await request.json()
       
       try {
-        // For now, we'll create a simple session without Firebase verification
-        // In a real app, you'd verify the Firebase token here
-        const decoded = jwt.decode(token, { complete: true })
-        const userInfo = decoded?.payload || {}
+        // First try to decode as Firebase token
+        let userInfo = {}
+        try {
+          const decoded = jwt.decode(token, { complete: true })
+          userInfo = decoded?.payload || {}
+        } catch (firebaseError) {
+          // If Firebase decode fails, try fallback token
+          try {
+            const fallbackPayload = JSON.parse(atob(token))
+            userInfo = fallbackPayload
+          } catch (fallbackError) {
+            throw new Error('Invalid token format')
+          }
+        }
         
         // Create or find user
         let user = await db.collection('users').findOne({ 
