@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,8 @@ export default function SetupPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [authChecking, setAuthChecking] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
 
   // Setup data
@@ -31,6 +33,177 @@ export default function SetupPage() {
     Friday: ['', '', '', '', '', ''],
     Saturday: ['', '', '', '', '', '']
   })
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/user', {
+          method: 'GET',
+          credentials: 'include' // Include cookies for authentication
+        })
+        
+        if (response.ok) {
+          const userData = await response.json()
+          setIsAuthenticated(true)
+          // If user already completed setup, redirect to homepage
+          if (userData.user.isSetupComplete) {
+            router.push('/homepage')
+          }
+        } else {
+          // Not authenticated, redirect to login
+          router.push('/login')
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        router.push('/login')
+      } finally {
+        setAuthChecking(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  const addSubject = () => {
+    setSubjects([...subjects, ''])
+  }
+
+  const removeSubject = (index) => {
+    if (subjects.length > 1) {
+      setSubjects(subjects.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateSubject = (index, value) => {
+    const newSubjects = [...subjects]
+    newSubjects[index] = value
+    setSubjects(newSubjects)
+  }
+
+  const updateTimetable = (day, periodIndex, subject) => {
+    setTimetable(prev => ({
+      ...prev,
+      [day]: prev[day].map((s, i) => i === periodIndex ? subject : s)
+    }))
+  }
+
+  const validateStep = () => {
+    if (step === 1) {
+      if (!semester || semester < 1 || semester > 8) {
+        setError('Please select a valid semester (1-8)')
+        return false
+      }
+      const validSubjects = subjects.filter(s => s.trim() !== '')
+      if (validSubjects.length < 2) {
+        setError('Please add at least 2 subjects')
+        return false
+      }
+    }
+    
+    if (step === 2) {
+      // Validate timetable - each day should have 6 classes
+      for (const day of DAYS) {
+        const daySchedule = timetable[day]
+        const filledSlots = daySchedule.filter(s => s.trim() !== '').length
+        if (filledSlots !== 6) {
+          setError(`${day} must have exactly 6 classes scheduled`)
+          return false
+        }
+      }
+    }
+    
+    if (step === 3) {
+      if (!startDate || !endDate) {
+        setError('Please select both start and end dates')
+        return false
+      }
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (start >= end) {
+        setError('End date must be after start date')
+        return false
+      }
+    }
+    
+    setError('')
+    return true
+  }
+
+  const handleNext = () => {
+    if (validateStep()) {
+      setStep(step + 1)
+    }
+  }
+
+  const handlePrevious = () => {
+    setStep(step - 1)
+    setError('')
+  }
+
+  const handleSubmit = async () => {
+    if (!validateStep()) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const validSubjects = subjects.filter(s => s.trim() !== '')
+      
+      const response = await fetch('/api/user/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies for authentication
+        body: JSON.stringify({
+          semester: parseInt(semester),
+          subjects: validSubjects,
+          startDate,
+          endDate,
+          timetable
+        }),
+      })
+
+      if (response.ok) {
+        router.push('/homepage')
+      } else {
+        const data = await response.json()
+        setError(data.error || 'Setup failed')
+      }
+    } catch (error) {
+      console.error('Setup error:', error)
+      setError('Setup failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStepIcon = (stepNumber) => {
+    switch (stepNumber) {
+      case 1: return <GraduationCap className="w-5 h-5" />
+      case 2: return <Clock className="w-5 h-5" />
+      case 3: return <Calendar className="w-5 h-5" />
+      default: return null
+    }
+  }
+
+  // Show loading while checking authentication
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render anything if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null
+  }
 
   const addSubject = () => {
     setSubjects([...subjects, ''])
