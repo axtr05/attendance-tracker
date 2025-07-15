@@ -203,24 +203,39 @@ class AdditionalBackendTests:
             # Create a new session without authentication
             unauth_session = requests.Session()
             
-            protected_endpoints = [
-                '/user/setup',
+            # Test GET endpoints
+            get_endpoints = [
                 '/attendance/status',
-                '/attendance/enter',
                 '/attendance/records',
                 '/attendance/today-schedule',
                 '/attendance/subject/Math'
             ]
             
+            # Test POST endpoints
+            post_endpoints = [
+                ('/user/setup', {'semester': 'test'}),
+                ('/attendance/enter', {'date': '2024-01-01'})
+            ]
+            
             all_passed = True
-            for endpoint in protected_endpoints:
+            
+            # Test GET endpoints
+            for endpoint in get_endpoints:
                 response = unauth_session.get(f"{API_BASE}{endpoint}")
                 if response.status_code != 401:
-                    self.log_test(f"Unauthorized Access - {endpoint}", False, f"Expected 401, got {response.status_code}")
+                    self.log_test(f"Unauthorized Access - GET {endpoint}", False, f"Expected 401, got {response.status_code}")
+                    all_passed = False
+            
+            # Test POST endpoints
+            for endpoint, data in post_endpoints:
+                response = unauth_session.post(f"{API_BASE}{endpoint}", json=data)
+                if response.status_code != 401:
+                    self.log_test(f"Unauthorized Access - POST {endpoint}", False, f"Expected 401, got {response.status_code}")
                     all_passed = False
             
             if all_passed:
-                self.log_test("Unauthorized Access Patterns", True, f"All {len(protected_endpoints)} protected endpoints properly secured")
+                total_endpoints = len(get_endpoints) + len(post_endpoints)
+                self.log_test("Unauthorized Access Patterns", True, f"All {total_endpoints} protected endpoints properly secured")
                 return True
             else:
                 return False
