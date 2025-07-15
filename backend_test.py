@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import jwt
 
 # Configuration
-BASE_URL = "https://cace7ab5-a823-44bb-9947-d02e56a081c4.preview.emergentagent.com"
+BASE_URL = "https://cf85198e-f07a-4af1-b7e1-9c9ff2fb1e3a.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 class AttendanceTrackerAPITest:
